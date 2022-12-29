@@ -1,31 +1,30 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Rendering;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PetLove.Data;
 using PetLove.Data.Entities;
+using Vereyon.Web;
 
 namespace PetLove.Controllers
 {
     public class ClientesController : Controller
     {
         private readonly DataContext _context;
+        private readonly IFlashMessage _flashMessage;
 
-        public ClientesController(DataContext context)
+        public ClientesController(DataContext context,IFlashMessage flashMessage)
         {
             _context = context;
+            _flashMessage = flashMessage;
         }
 
-        // GET: Clientes
+       
         public async Task<IActionResult> Index()
         {
-              return View(await _context.Clientes.ToListAsync());
+            return View(await _context.Clientes
+                .ToListAsync());
         }
 
-        // GET: Clientes/Details/5
+        
         public async Task<IActionResult> Details(int? id)
         {
             if (id == null || _context.Clientes == null)
@@ -43,29 +42,47 @@ namespace PetLove.Controllers
             return View(cliente);
         }
 
-        // GET: Clientes/Create
+        
         public IActionResult Create()
         {
             return View();
         }
 
-        // POST: Clientes/Create
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
+      
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("Id,Document,FirstName,LastName,PhoneNumber,Address")] Cliente cliente)
+        public async Task<IActionResult> Create(Cliente cliente)
         {
             if (ModelState.IsValid)
             {
-                _context.Add(cliente);
-                await _context.SaveChangesAsync();
+                try
+                {
+                    _context.Add(cliente);
+                    await _context.SaveChangesAsync();
+                    _flashMessage.Info("Cliente creado exitosamente!");
+                    return RedirectToAction(nameof(Index));
+                }
+                catch (DbUpdateException dbUpdateException)
+                {
+                    if (dbUpdateException.InnerException.Message.Contains("duplicate"))
+                    {
+                        _flashMessage.Danger("Ya existe un cliente con el mismo nombre.");
+                    }
+                    else
+                    {
+                        _flashMessage.Danger(dbUpdateException.InnerException.Message);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    _flashMessage.Danger(exception.Message);
+                }
                 return RedirectToAction(nameof(Index));
             }
             return View(cliente);
         }
 
-        // GET: Clientes/Edit/5
+        
         public async Task<IActionResult> Edit(int? id)
         {
             if (id == null || _context.Clientes == null)
@@ -81,12 +98,10 @@ namespace PetLove.Controllers
             return View(cliente);
         }
 
-        // POST: Clientes/Edit/5
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
+
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("Id,Document,FirstName,LastName,PhoneNumber,Address")] Cliente cliente)
+        public async Task<IActionResult> Edit(int id, Cliente cliente)
         {
             if (id != cliente.Id)
             {
@@ -99,24 +114,28 @@ namespace PetLove.Controllers
                 {
                     _context.Update(cliente);
                     await _context.SaveChangesAsync();
+                    _flashMessage.Info("Cliente actualizado exitosamente!");
                 }
-                catch (DbUpdateConcurrencyException)
+                catch (DbUpdateException dbUpdateException)
                 {
-                    if (!ClienteExists(cliente.Id))
+                    if (dbUpdateException.InnerException.Message.Contains("duplicate"))
                     {
-                        return NotFound();
+                        _flashMessage.Danger("Ya existe un cliente con el mismo nombre.");
                     }
                     else
                     {
-                        throw;
+                        _flashMessage.Danger(dbUpdateException.InnerException.Message);
                     }
+                }
+                catch (Exception exception)
+                {
+                    _flashMessage.Danger(exception.Message);
                 }
                 return RedirectToAction(nameof(Index));
             }
             return View(cliente);
         }
 
-        // GET: Clientes/Delete/5
         public async Task<IActionResult> Delete(int? id)
         {
             if (id == null || _context.Clientes == null)
@@ -131,31 +150,20 @@ namespace PetLove.Controllers
                 return NotFound();
             }
 
-            return View(cliente);
-        }
-
-        // POST: Clientes/Delete/5
-        [HttpPost, ActionName("Delete")]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteConfirmed(int id)
-        {
-            if (_context.Clientes == null)
-            {
-                return Problem("Entity set 'DataContext.Clientes'  is null.");
-            }
-            var cliente = await _context.Clientes.FindAsync(id);
-            if (cliente != null)
+            try
             {
                 _context.Clientes.Remove(cliente);
+                await _context.SaveChangesAsync();
+                _flashMessage.Info("Registro borrado.");
+
             }
-            
-            await _context.SaveChangesAsync();
+            catch
+            {
+                _flashMessage.Danger("No se puede borrar el cliente porque tiene registros relacionados.");
+            }
+
             return RedirectToAction(nameof(Index));
         }
 
-        private bool ClienteExists(int id)
-        {
-          return _context.Clientes.Any(e => e.Id == id);
-        }
     }
 }
